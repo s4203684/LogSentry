@@ -10,12 +10,17 @@ log_lines = [
     "Nov 12 09:43:10 web01 sshd[4840]: Connection closed by 203.0.113.45 port 51260 [preauth]",
 ]
 
-critical_count = 0
-high_count = 0
-medium_count = 0
-low_count = 0
-info_count = 0
-unknown_count = 0
+severity_counts = {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "INFO": 0,
+    "UNKNOWN": 0
+}
+
+failed_by_IP = {}
+
 line_count = 0
 internal_count = 0
 external_count =  0
@@ -26,7 +31,7 @@ for log_number, log_line in enumerate(log_lines, start=1):
     if not log_line.strip():
         continue
     info = log_line.split()
-    line_count +=1
+    line_count += 1
 
     timestamp = f"{info[0]} {info[1]} {info[2]}"
     hostname = info[3]
@@ -48,62 +53,62 @@ for log_number, log_line in enumerate(log_lines, start=1):
     if is_successful_login and is_root:
         event_type = "SUCCESSFUL_LOGIN"
         severity = "CRITICAL"
-        critical_count +=1
         alert =f"{severity}: {user} logged in successfully from {source_ip}"
         alerts.append(alert)
   
     elif is_failed_login and is_root:
         event_type = "FAILED_LOGIN"
         severity = "HIGH"
-        high_count +=1
         alert =f"{severity}: failed {user} login from {source_ip}"
         alerts.append(alert)
     
     elif is_failed_login and is_invalid_user:
         event_type = "FAILED_LOGIN"
         severity = "MEDIUM"
-        medium_count +=1
   
     elif is_failed_login:
         event_type = "FAILED_LOGIN"
         severity = "LOW"
-        low_count +=1
 
    
     elif is_successful_login:
         event_type = "SUCCESSFUL_LOGIN"
         severity = "INFO"
-        info_count +=1
   
     else:
         event_type = "UNKNOWN"
         severity = "UNKNOWN"
-        unknown_count +=1
   
     print(f"[{log_number:>2}] {severity:<8} {event_type:<17} {user:<12} {source_ip}", end="")
+
+    severity_counts[severity] += 1
+
 
     is_internal = source_ip.startswith(("10.", "192.168."))
     if is_internal:
         print("(internal)")
-        internal_count +=1
+        internal_count += 1 
     else:
         print("(external)")
-        external_count +=1
+        external_count += 1
+
+    if source_ip in failed_by_IP:
+        failed_by_IP[source_ip] += 1
+    else:
+        failed_by_IP[source_ip] = 1
 
 print("=========================")
 
 print("----- Summary -----")
-print(f"Lines processed : {line_count}")
-print(f"Critical        :{critical_count}")
-print(f"High            :{high_count}")
-print(f"Medium          :{medium_count}")
-print(f"Low             :{low_count}")
-print(f"Info            :{info_count}")
-print(f"Unknown         :{unknown_count}")
-print(f"Internal Source :{internal_count}")
-print(f"External Source :{external_count}")
+for severity_name, count in severity_counts.items():
+    print(f"{severity_name:<9}: {count}")
 print("--------------------")
+
+
 print("--- Alerts ---")
 for alert in alerts:
     print(alert)
 print("-------")
+
+for source, count in failed_by_IP.items():
+    print(f"{source} failed {count} times")
